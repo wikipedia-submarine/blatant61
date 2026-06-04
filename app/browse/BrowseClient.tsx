@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
@@ -265,12 +265,12 @@ function FilterSidebar({
                 onClick={() => setActiveCategory(cat.value)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors cursor-pointer ${
                   activeCategory === cat.value 
-                    ? "bg-white text-[#111827] shadow-[0_2px_8px_rgba(74,95,127,0.08)]" 
+                    ? "bg-[#3B4E69] text-white" 
                     : "text-[#6B7280] hover:bg-white/50"
                 }`}
               >
                 <span>{cat.label}</span>
-                <span className={`text-[12px] ${activeCategory === cat.value ? "text-[#4A5F7F]" : "text-[#6B7280]/60"}`}>
+                <span className={`text-[12px] ${activeCategory === cat.value ? "text-white/80" : "text-[#6B7280]/60"}`}>
                   {cat.count}
                 </span>
               </button>
@@ -406,11 +406,11 @@ export default function BrowseClient({ venuesData }: Props) {
   const { t } = useLanguage()
   const searchParams = useSearchParams()
   
-  // Add sqm to venues data
-  const venuesWithSqm = venuesData.map(v => ({
+  // Add sqm to venues data - memoized to prevent infinite re-renders
+  const venuesWithSqm = useMemo(() => venuesData.map(v => ({
     ...v,
     sqm: v.sqm || Math.floor(v.guests * 8 + Math.random() * 50)
-  }))
+  })), [venuesData])
   
   const [allVenues, setAllVenues] = useState(venuesWithSqm)
   const [filtered, setFiltered] = useState(venuesWithSqm)
@@ -624,8 +624,8 @@ export default function BrowseClient({ venuesData }: Props) {
             <span className="text-white">Browse Venues</span>
           </div>
           
-          <h1 className="text-white font-bold text-[2.8rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.05] tracking-tight mb-4">
-            Browse <span className="italic font-serif font-normal">venues</span>
+            <h1 className="text-white font-bold text-[2.8rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.05] tracking-tight mb-4">
+            Browse <span className="italic font-serif font-normal text-[#3B4E69]">venues</span>
           </h1>
           <p className="text-white/80 font-medium text-[15px] md:text-[16px] max-w-[480px] leading-relaxed">
             Explore handpicked venues for any occasion.<br />
@@ -638,9 +638,9 @@ export default function BrowseClient({ venuesData }: Props) {
       {/* FLOATING SEARCH BAR                          */}
       {/* ============================================ */}
       <div className="relative z-20 w-full max-w-[1400px] mx-auto px-6 md:px-12 -mt-10">
-        <div className="bg-white rounded-[20px] shadow-[0_8px_40px_rgba(74,95,127,0.12)] border border-[rgba(74,95,127,0.08)] px-4 md:px-6 py-4 flex flex-wrap items-center gap-3">
+        <div className="bg-white rounded-[20px] border border-[rgba(74,95,127,0.08)] px-4 md:px-6 py-4 flex items-center gap-3">
           {/* Search Input */}
-          <div className="flex items-center gap-2.5 bg-[#F7F9FC] rounded-[14px] px-4 py-3 flex-1 min-w-[200px] md:min-w-[240px] border border-[rgba(74,95,127,0.06)]">
+          <div className="flex items-center gap-2.5 bg-[#F7F9FC] rounded-[14px] px-4 py-3 min-w-[180px] md:min-w-[220px] border border-[rgba(74,95,127,0.06)]">
             <Search className="w-4 h-4 text-[#6B7280]" />
             <input
               type="text"
@@ -733,22 +733,22 @@ export default function BrowseClient({ venuesData }: Props) {
           {/* More Filters */}
           <button 
             onClick={() => setMobileFiltersOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#6B7280] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer lg:hidden"
+            className="hidden xl:flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#6B7280] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer"
           >
             <SlidersHorizontal className="w-4 h-4" />
             More filters
           </button>
 
           {/* Spacer */}
-          <div className="flex-1 hidden lg:block" />
+          <div className="flex-1" />
 
           {/* Sort + View toggle */}
-          <div className="flex items-center gap-2 ml-auto lg:ml-0">
+          <div className="flex items-center gap-2">
             <span className="text-[12px] text-[#6B7280] font-medium hidden xl:inline">Sort by:</span>
             <div className="relative" ref={sortRef}>
               <button
                 onClick={() => { setSortOpen(!sortOpen); setLocationOpen(false); setCategoryOpen(false); setDateOpen(false); setGuestsOpen(false); }}
-                className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] hover:bg-[#F7F9FC] transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-3 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111827] hover:bg-[#F7F9FC] transition-colors cursor-pointer"
               >
                 {sortBy === "popular" ? "Popular" : sortBy === "price-low" ? "Price: Low" : sortBy === "price-high" ? "Price: High" : "Guests"}
                 <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${sortOpen ? "rotate-180" : ""}`} />
@@ -780,13 +780,13 @@ export default function BrowseClient({ venuesData }: Props) {
             <div className="hidden md:flex items-center border border-[rgba(74,95,127,0.08)] rounded-[14px] overflow-hidden">
               <button 
                 onClick={() => setViewMode("grid")}
-                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "grid" ? "bg-[#4A5F7F] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
+                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "grid" ? "bg-[#3B4E69] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
               >
                 <LayoutGrid className="w-4 h-4" />
               </button>
               <button 
                 onClick={() => setViewMode("list")}
-                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "list" ? "bg-[#4A5F7F] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
+                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "list" ? "bg-[#3B4E69] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
               >
                 <List className="w-4 h-4" />
               </button>
