@@ -180,15 +180,15 @@ function NewHeader() {
       <>
         <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none py-4 md:py-5">
           <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 flex justify-center">
-            <div className="pointer-events-auto bg-white rounded-full border border-[rgba(74,95,127,0.06)] px-6 py-3 flex items-center gap-8 transition-all duration-300">
+            <div className="pointer-events-auto bg-white rounded-full shadow-[0_2px_16px_rgba(0,0,0,0.06)] px-6 py-3 flex items-center gap-8 transition-all duration-300">
               {/* Logo */}
-              <Link href="/" className="font-extrabold tracking-tight text-lg text-[#111827]">
+              <Link href="/" className="font-extrabold tracking-tight text-[17px] text-[#111827]">
                 Festivo
               </Link>
 
               {/* Center: Links (Desktop only) */}
               {!isMobile && (
-                <nav className="hidden md:flex items-center gap-8 font-semibold text-[13px] text-[#111827]">
+                <nav className="hidden md:flex items-center gap-7 font-medium text-[13px] text-[#111827]">
                   <Link href="/browse" className="hover:text-[#4A5F7F] transition-colors">Venues</Link>
                   <Link href="/browse" className="hover:text-[#4A5F7F] transition-colors">Categories</Link>
                   <Link href="/list-your-space" className="hover:text-[#4A5F7F] transition-colors">List Your Space</Link>
@@ -199,8 +199,8 @@ function NewHeader() {
               {/* Right: Actions */}
               <div className="flex items-center gap-3">
                 {!isMobile && (
-                  <Link href="/profile/saved" className="w-9 h-9 rounded-full bg-transparent flex items-center justify-center hover:bg-[#F7F9FC] transition-colors cursor-pointer">
-                    <Heart className="w-4 h-4 text-[#6B7280]" />
+                  <Link href="/profile/saved" className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center hover:bg-[#F7F9FC] transition-colors cursor-pointer">
+                    <Heart className="w-[18px] h-[18px] text-[#6B7280] stroke-[1.5]" />
                   </Link>
                 )}
 
@@ -208,8 +208,8 @@ function NewHeader() {
                   user ? (
                     <AuthUserMenu variant="desktop" />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="w-9 h-9 rounded-full bg-[#3B4E69] flex items-center justify-center text-white text-[12px] font-bold">
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-full bg-[#3B4E69] flex items-center justify-center text-white text-[11px] font-bold">
                         SG
                       </div>
                     </div>

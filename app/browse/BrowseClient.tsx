@@ -107,10 +107,10 @@ function VenueCard({
   }, [venue.image])
 
   return (
-    <div className="group relative bg-white rounded-[24px] overflow-hidden border border-[rgba(74,95,127,0.08)] hover:shadow-[0_16px_48px_rgba(74,95,127,0.12)] hover:-translate-y-1.5 transition-all duration-[250ms] cursor-pointer">
+    <div className="group relative bg-white rounded-[16px] overflow-hidden border border-[rgba(74,95,127,0.08)] hover:shadow-[0_16px_48px_rgba(74,95,127,0.12)] hover:-translate-y-1.5 transition-all duration-[250ms] cursor-pointer">
       <Link href={`/venues/${detailPageId}`} className="block">
         {/* Image Container */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#F7F9FC] rounded-t-[20px]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#F7F9FC]">
           {imageLoading ? (
             <Skeleton className="w-full h-full" />
           ) : (
@@ -179,13 +179,14 @@ function VenueCard({
             </span>
           </div>
 
-          {/* Price + View Details Row */}
-          <div className="flex items-center justify-between pt-3 border-t border-[rgba(74,95,127,0.08)]">
-            <div>
-              <span className="text-[20px] font-bold text-[#111827]">${venue.price}</span>
-              <span className="text-[12px] text-[#6B7280] font-medium ml-1">/night</span>
-            </div>
+          {/* Price */}
+          <div className="mb-4">
+            <span className="text-[20px] font-bold text-[#111827]">${venue.price}</span>
+            <span className="text-[12px] text-[#6B7280] font-medium ml-1">/night</span>
+          </div>
 
+          {/* View Details Row - with separator */}
+          <div className="pt-3 border-t border-[rgba(74,95,127,0.08)]">
             <span className="text-[13px] font-semibold text-[#4A5F7F] flex items-center gap-1 group-hover:gap-2 transition-all">
               View details
               <ChevronRight className="w-4 h-4" />
@@ -199,7 +200,7 @@ function VenueCard({
 
 function VenueCardSkeleton() {
   return (
-    <div className="bg-white rounded-[24px] overflow-hidden border border-[rgba(74,95,127,0.08)]">
+    <div className="bg-white rounded-[16px] overflow-hidden border border-[rgba(74,95,127,0.08)]">
       <Skeleton className="aspect-[4/3] w-full" />
       <div className="p-5 space-y-3">
         <Skeleton className="h-5 w-3/4" />
@@ -242,7 +243,7 @@ function FilterSidebar({
   const [amenitiesOpen, setAmenitiesOpen] = useState(true)
 
   return (
-    <div className={`bg-[#F7F9FC] rounded-[24px] border border-[rgba(74,95,127,0.08)] p-6 ${className}`}>
+    <div className={`bg-[#F7F9FC] rounded-[16px] border border-[rgba(74,95,127,0.08)] p-6 ${className}`}>
       {/* Categories Section */}
       <div className="mb-6">
         <button 
@@ -263,14 +264,14 @@ function FilterSidebar({
               <button
                 key={cat.value}
                 onClick={() => setActiveCategory(cat.value)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[10px] text-[13px] font-medium transition-colors cursor-pointer ${
                   activeCategory === cat.value 
-                    ? "bg-[#3B4E69] text-white" 
+                    ? "bg-[#3B4E69]/15 text-[#3B4E69]" 
                     : "text-[#6B7280] hover:bg-white/50"
                 }`}
               >
                 <span>{cat.label}</span>
-                <span className={`text-[12px] ${activeCategory === cat.value ? "text-white/80" : "text-[#6B7280]/60"}`}>
+                <span className={`text-[12px] ${activeCategory === cat.value ? "text-[#3B4E69]/70" : "text-[#6B7280]/60"}`}>
                   {cat.count}
                 </span>
               </button>
@@ -608,7 +609,7 @@ export default function BrowseClient({ venuesData }: Props) {
         {/* Banner Image */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/images/browse.png')" }}
+          style={{ backgroundImage: "url('/images/browsebanner.png')" }}
         />
         {/* Dark overlay for text readability */}
         <div className="absolute inset-0 z-[1] bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
@@ -624,8 +625,8 @@ export default function BrowseClient({ venuesData }: Props) {
             <span className="text-white">Browse Venues</span>
           </div>
           
-            <h1 className="text-white font-bold text-[2.8rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.05] tracking-tight mb-4">
-            Browse <span className="italic font-serif font-normal text-[#3B4E69]">venues</span>
+          <h1 className="text-white font-bold text-[2.8rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.05] tracking-tight mb-4">
+            Browse <span className="italic font-serif font-normal bg-gradient-to-r from-[#2A3B52] to-[#4A6182] bg-clip-text text-transparent">venues</span>
           </h1>
           <p className="text-white/80 font-medium text-[15px] md:text-[16px] max-w-[480px] leading-relaxed">
             Explore handpicked venues for any occasion.<br />
@@ -827,7 +828,7 @@ export default function BrowseClient({ venuesData }: Props) {
 
             {/* Venue Cards Grid */}
             {filtered.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-[24px] border border-[rgba(74,95,127,0.08)]">
+              <div className="text-center py-20 bg-white rounded-[16px] border border-[rgba(74,95,127,0.08)]">
                 <p className="text-lg text-[#6B7280] mb-6">
                   No venues match your search criteria
                 </p>
