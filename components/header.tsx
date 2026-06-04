@@ -174,13 +174,80 @@ function NewHeader() {
 
   const isBrowse = pathname === '/browse'
 
+  // Floating pill navbar for browse page
+  if (isBrowse) {
+    return (
+      <>
+        <header className="fixed top-0 left-0 right-0 z-50 pointer-events-none py-4 md:py-5">
+          <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 flex justify-center">
+            <div className={`pointer-events-auto bg-white rounded-full shadow-[0_4px_24px_rgba(74,95,127,0.12)] border border-[rgba(74,95,127,0.08)] px-6 py-3 flex items-center gap-8 transition-all duration-300 ${scrolled ? 'shadow-[0_8px_32px_rgba(74,95,127,0.15)]' : ''}`}>
+              {/* Logo */}
+              <Link href="/" className="font-extrabold tracking-tight text-lg text-[#111827]">
+                Festivo
+              </Link>
+
+              {/* Center: Links (Desktop only) */}
+              {!isMobile && (
+                <nav className="hidden md:flex items-center gap-8 font-semibold text-[13px] text-[#111827]">
+                  <Link href="/browse" className="hover:text-[#4A5F7F] transition-colors">Venues</Link>
+                  <Link href="/browse" className="hover:text-[#4A5F7F] transition-colors">Categories</Link>
+                  <Link href="/list-your-space" className="hover:text-[#4A5F7F] transition-colors">List Your Space</Link>
+                  <Link href="/about" className="hover:text-[#4A5F7F] transition-colors">About</Link>
+                </nav>
+              )}
+
+              {/* Separator */}
+              <div className="hidden md:block w-px h-6 bg-[rgba(74,95,127,0.12)]" />
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-3">
+                {!isMobile && (
+                  <Link href="/profile/saved" className="w-9 h-9 rounded-full bg-[#F7F9FC] flex items-center justify-center hover:bg-[#EEF3F8] transition-colors cursor-pointer">
+                    <Heart className="w-4 h-4 text-[#6B7280]" />
+                  </Link>
+                )}
+
+                {!loading ? (
+                  user ? (
+                    <AuthUserMenu variant="desktop" />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {!isMobile && (
+                        <Link
+                          href="/sign-in"
+                          className="font-semibold text-[#111827] hover:text-[#4A5F7F] text-[13px] px-3 py-2 transition-colors"
+                        >
+                          Sign in
+                        </Link>
+                      )}
+                      <Link
+                        href="/sign-up"
+                        className="flex items-center justify-center font-bold bg-[#111827] text-white rounded-full px-5 py-2 text-[12px] hover:bg-black transition-all"
+                      >
+                        Sign up
+                      </Link>
+                    </div>
+                  )
+                ) : (
+                  <div className="w-[100px] h-[36px]" />
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {isMobile && <MobileBottomNav />}
+      </>
+    )
+  }
+
   return (
     <>
       <header 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 pointer-events-auto ${
           scrolled 
             ? "bg-white/95 backdrop-blur-md shadow-[0_4px_20px_rgba(107,122,144,0.08)] py-3 md:py-4 border-b border-[#E7ECF3]" 
-            : `${isBrowse ? 'bg-white/95 border-b border-[#E7ECF3]' : 'bg-[#F5F7FB]'} backdrop-blur-md py-5 md:py-6`
+            : "bg-[#F5F7FB] backdrop-blur-md py-5 md:py-6"
         }`}
       >
         <div className="w-full max-w-[1600px] min-[1700px]:max-w-[1800px] mx-auto px-6 md:px-12 flex items-center justify-between">

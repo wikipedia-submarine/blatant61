@@ -2,13 +2,20 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useSearchParams } from "next/navigation"
-import { Users, Search, ChevronDown, Check, SlidersHorizontal, ChevronRight, ChevronLeft } from "lucide-react"
+import { 
+  Users, Search, ChevronDown, Check, SlidersHorizontal, 
+  ChevronRight, ChevronLeft, MapPin, Heart, X, 
+  LayoutGrid, List, ChevronUp, Wifi, Car, Waves
+} from "lucide-react"
 import { useLanguage } from "@/lib/language-context"
 import { getApprovedVenues } from "@/lib/firestore-venues"
-import { BrowseVenueCard, BrowseVenueCardSkeleton } from "@/components/browseVenueCard"
+import { getImageFromFirestore } from "@/lib/cloud-storage"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
-type VenueCategory = "all" | "apartments" | "villas" | "rooftops" | "studios"
+type VenueCategory = "all" | "apartments" | "villas" | "rooftops" | "studios" | "modern" | "outdoor" | "event" | "unique"
 
 interface Venue {
   id: number
@@ -16,6 +23,7 @@ interface Venue {
   locationKey: string
   price: number
   guests: number
+  sqm: number
   image: string
   images: string[]
   description: string
@@ -30,44 +38,418 @@ interface Props {
   venuesData: Venue[]
 }
 
-const categories: { value: VenueCategory; label: string }[] = [
-  { value: "all", label: "All Categories" },
-  { value: "apartments", label: "Apartments" },
-  { value: "villas", label: "Villas" },
-  { value: "rooftops", label: "Rooftops" },
-  { value: "studios", label: "Studios" },
+const categories: { value: VenueCategory; label: string; count: number }[] = [
+  { value: "all", label: "All Categories", count: 120 },
+  { value: "rooftops", label: "Rooftops", count: 32 },
+  { value: "villas", label: "Villas", count: 48 },
+  { value: "modern", label: "Modern Spaces", count: 34 },
+  { value: "outdoor", label: "Outdoor Spaces", count: 36 },
+  { value: "event", label: "Event Halls", count: 28 },
+  { value: "unique", label: "Unique Stays", count: 21 },
 ]
 
-const venueTypes = ["All Types", "Indoor", "Outdoor", "Mixed"]
+const capacityOptions = [
+  { value: "0-20", label: "Up to 20 guests" },
+  { value: "20-50", label: "20 - 50 guests" },
+  { value: "50-100", label: "50 - 100 guests" },
+  { value: "100+", label: "100+ guests" },
+]
+
+const amenitiesOptions = [
+  { value: "pool", label: "Pool", icon: Waves },
+  { value: "wifi", label: "WiFi", icon: Wifi },
+  { value: "parking", label: "Parking", icon: Car },
+]
+
 const ITEMS_PER_PAGE = 12
+
+// Individual Venue Card matching the reference design
+function VenueCard({ 
+  venue, 
+  resolveLabel 
+}: { 
+  venue: Venue
+  resolveLabel: (key: string) => string 
+}) {
+  const [resolvedImage, setResolvedImage] = useState<string | null>(
+    venue.image.startsWith("firestore://") ? null : venue.image
+  )
+  const [imageLoading, setImageLoading] = useState(venue.image.startsWith("firestore://"))
+  const [isFavorited, setIsFavorited] = useState(false)
+
+  const venueName = resolveLabel(venue.nameKey)
+  const venueLocation = resolveLabel(venue.locationKey)
+
+  const isHardcodedVenue = typeof venue.id === 'number' && venue.id >= 1 && venue.id <= 6
+  const detailPageId = isHardcodedVenue ? venue.id : venue.firestoreId
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function resolveImage() {
+      if (venue.image.startsWith("firestore://")) {
+        try {
+          const imageId = venue.image.replace("firestore://", "")
+          const resolved = await getImageFromFirestore(imageId)
+          if (isMounted && resolved) {
+            setResolvedImage(resolved)
+          }
+        } catch (error) {
+          console.error("Failed to resolve image:", error)
+        } finally {
+          if (isMounted) setImageLoading(false)
+        }
+      }
+    }
+
+    resolveImage()
+    return () => { isMounted = false }
+  }, [venue.image])
+
+  return (
+    <div className="group relative bg-white rounded-[20px] overflow-hidden border border-[rgba(74,95,127,0.08)] hover:shadow-[0_16px_48px_rgba(74,95,127,0.12)] transition-all duration-300 cursor-pointer">
+      <Link href={`/venues/${detailPageId}`} className="block">
+        {/* Image Container */}
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#F7F9FC]">
+          {imageLoading ? (
+            <Skeleton className="w-full h-full" />
+          ) : (
+            <Image
+              src={resolvedImage || "/images/venues/default.jpg"}
+              alt={venueName}
+              fill
+              className="object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+              loading="lazy"
+              sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+            />
+          )}
+
+          {/* Premium Badge */}
+          {venue.premium && (
+            <div className="absolute top-3.5 left-3.5 z-10">
+              <span className="bg-[#3B4E69] text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md">
+                Popular
+              </span>
+            </div>
+          )}
+
+          {/* Favorite Heart */}
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setIsFavorited(!isFavorited)
+            }}
+            className="absolute top-3.5 right-3.5 z-10 w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.08)] cursor-pointer"
+          >
+            <Heart
+              className={`w-4.5 h-4.5 transition-colors ${
+                isFavorited ? "fill-[#4A5F7F] text-[#4A5F7F]" : "text-[#6B7280]"
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Card Content */}
+        <div className="p-5">
+          {/* Title */}
+          <h3 className="text-[16px] font-bold text-[#111827] mb-2 truncate leading-snug">
+            {venueName}
+          </h3>
+
+          {/* Location */}
+          <div className="flex items-center gap-1.5 text-[#6B7280] mb-4">
+            <MapPin className="w-3.5 h-3.5" />
+            <span className="text-[13px] font-medium truncate">
+              {venueLocation}
+            </span>
+          </div>
+
+          {/* Guests + Sqm Row */}
+          <div className="flex items-center gap-4 text-[#6B7280] mb-4">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              <span className="text-[12px] font-medium">
+                Up to {venue.guests} guests
+              </span>
+            </div>
+            <span className="text-[12px] text-[#6B7280]/60">•</span>
+            <span className="text-[12px] font-medium">
+              {venue.sqm || Math.floor(venue.guests * 8)} m²
+            </span>
+          </div>
+
+          {/* Price + View Details Row */}
+          <div className="flex items-center justify-between pt-3 border-t border-[rgba(74,95,127,0.08)]">
+            <div>
+              <span className="text-[20px] font-bold text-[#111827]">${venue.price}</span>
+              <span className="text-[12px] text-[#6B7280] font-medium ml-1">/night</span>
+            </div>
+
+            <span className="text-[13px] font-semibold text-[#4A5F7F] flex items-center gap-1 group-hover:gap-2 transition-all">
+              View details
+              <ChevronRight className="w-4 h-4" />
+            </span>
+          </div>
+        </div>
+      </Link>
+    </div>
+  )
+}
+
+function VenueCardSkeleton() {
+  return (
+    <div className="bg-white rounded-[20px] overflow-hidden border border-[rgba(74,95,127,0.08)]">
+      <Skeleton className="aspect-[4/3] w-full" />
+      <div className="p-5 space-y-3">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-3 w-2/3" />
+        <div className="flex justify-between items-center pt-3 border-t border-[rgba(74,95,127,0.08)]">
+          <Skeleton className="h-6 w-1/4" />
+          <Skeleton className="h-4 w-1/4" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Filter Sidebar Component
+function FilterSidebar({ 
+  activeCategory, 
+  setActiveCategory,
+  priceRange,
+  setPriceRange,
+  selectedCapacity,
+  setSelectedCapacity,
+  selectedAmenities,
+  setSelectedAmenities,
+  className = ""
+}: {
+  activeCategory: VenueCategory
+  setActiveCategory: (cat: VenueCategory) => void
+  priceRange: [number, number]
+  setPriceRange: (range: [number, number]) => void
+  selectedCapacity: string[]
+  setSelectedCapacity: (caps: string[]) => void
+  selectedAmenities: string[]
+  setSelectedAmenities: (ams: string[]) => void
+  className?: string
+}) {
+  const [categoriesOpen, setCategoriesOpen] = useState(true)
+  const [priceOpen, setPriceOpen] = useState(true)
+  const [capacityOpen, setCapacityOpen] = useState(true)
+  const [amenitiesOpen, setAmenitiesOpen] = useState(true)
+
+  return (
+    <div className={`bg-[#F7F9FC] rounded-[20px] border border-[rgba(74,95,127,0.08)] p-5 ${className}`}>
+      {/* Categories Section */}
+      <div className="mb-6">
+        <button 
+          onClick={() => setCategoriesOpen(!categoriesOpen)}
+          className="w-full flex items-center justify-between mb-4 cursor-pointer"
+        >
+          <h3 className="text-[14px] font-bold text-[#111827]">Categories</h3>
+          {categoriesOpen ? (
+            <ChevronUp className="w-4 h-4 text-[#6B7280]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+          )}
+        </button>
+        
+        {categoriesOpen && (
+          <div className="space-y-1">
+            {categories.map((cat) => (
+              <button
+                key={cat.value}
+                onClick={() => setActiveCategory(cat.value)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors cursor-pointer ${
+                  activeCategory === cat.value 
+                    ? "bg-white text-[#111827] shadow-[0_2px_8px_rgba(74,95,127,0.08)]" 
+                    : "text-[#6B7280] hover:bg-white/50"
+                }`}
+              >
+                <span>{cat.label}</span>
+                <span className={`text-[12px] ${activeCategory === cat.value ? "text-[#4A5F7F]" : "text-[#6B7280]/60"}`}>
+                  {cat.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Price Range Section */}
+      <div className="mb-6">
+        <button 
+          onClick={() => setPriceOpen(!priceOpen)}
+          className="w-full flex items-center justify-between mb-4 cursor-pointer"
+        >
+          <h3 className="text-[14px] font-bold text-[#111827]">Price Range</h3>
+          {priceOpen ? (
+            <ChevronUp className="w-4 h-4 text-[#6B7280]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+          )}
+        </button>
+        
+        {priceOpen && (
+          <div>
+            <div className="relative h-2 bg-[#E5E7EB] rounded-full mb-4">
+              <div 
+                className="absolute h-full bg-[#4A5F7F] rounded-full"
+                style={{ 
+                  left: `${(priceRange[0] / 2000) * 100}%`, 
+                  width: `${((priceRange[1] - priceRange[0]) / 2000) * 100}%` 
+                }}
+              />
+              <input
+                type="range"
+                min="0"
+                max="2000"
+                value={priceRange[1]}
+                onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                className="absolute w-full h-full opacity-0 cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center justify-between text-[12px] text-[#6B7280]">
+              <span>$0</span>
+              <span>$2,000+</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Capacity Section */}
+      <div className="mb-6">
+        <button 
+          onClick={() => setCapacityOpen(!capacityOpen)}
+          className="w-full flex items-center justify-between mb-4 cursor-pointer"
+        >
+          <h3 className="text-[14px] font-bold text-[#111827]">Capacity</h3>
+          {capacityOpen ? (
+            <ChevronUp className="w-4 h-4 text-[#6B7280]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+          )}
+        </button>
+        
+        {capacityOpen && (
+          <div className="space-y-2">
+            {capacityOptions.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-3 cursor-pointer group"
+              >
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  selectedCapacity.includes(opt.value) 
+                    ? "bg-[#4A5F7F] border-[#4A5F7F]" 
+                    : "border-[#D1D5DB] group-hover:border-[#9CA3AF]"
+                }`}>
+                  {selectedCapacity.includes(opt.value) && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                <span className="text-[13px] text-[#6B7280] group-hover:text-[#111827] transition-colors">
+                  {opt.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Amenities Section */}
+      <div>
+        <button 
+          onClick={() => setAmenitiesOpen(!amenitiesOpen)}
+          className="w-full flex items-center justify-between mb-4 cursor-pointer"
+        >
+          <h3 className="text-[14px] font-bold text-[#111827]">Amenities</h3>
+          {amenitiesOpen ? (
+            <ChevronUp className="w-4 h-4 text-[#6B7280]" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+          )}
+        </button>
+        
+        {amenitiesOpen && (
+          <div className="space-y-2">
+            {amenitiesOptions.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-3 cursor-pointer group"
+              >
+                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  selectedAmenities.includes(opt.value) 
+                    ? "bg-[#4A5F7F] border-[#4A5F7F]" 
+                    : "border-[#D1D5DB] group-hover:border-[#9CA3AF]"
+                }`}>
+                  {selectedAmenities.includes(opt.value) && (
+                    <Check className="w-3 h-3 text-white" />
+                  )}
+                </div>
+                <span className="text-[13px] text-[#6B7280] group-hover:text-[#111827] transition-colors flex items-center gap-2">
+                  <opt.icon className="w-4 h-4" />
+                  {opt.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function BrowseClient({ venuesData }: Props) {
   const { t } = useLanguage()
   const searchParams = useSearchParams()
-  const [allVenues, setAllVenues] = useState(venuesData)
-  const [filtered, setFiltered] = useState(venuesData)
+  
+  // Add sqm to venues data
+  const venuesWithSqm = venuesData.map(v => ({
+    ...v,
+    sqm: v.sqm || Math.floor(v.guests * 8 + Math.random() * 50)
+  }))
+  
+  const [allVenues, setAllVenues] = useState(venuesWithSqm)
+  const [filtered, setFiltered] = useState(venuesWithSqm)
   const [activeCategory, setActiveCategory] = useState<VenueCategory>("all")
   const [activeCity, setActiveCity] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [sortBy, setSortBy] = useState("popular")
   const [currentPage, setCurrentPage] = useState(1)
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
+  // Filter states
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 2000])
+  const [selectedCapacity, setSelectedCapacity] = useState<string[]>([])
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
+  
   // Dropdown states
+  const [locationOpen, setLocationOpen] = useState(false)
   const [categoryOpen, setCategoryOpen] = useState(false)
-  const [typeOpen, setTypeOpen] = useState(false)
+  const [dateOpen, setDateOpen] = useState(false)
+  const [guestsOpen, setGuestsOpen] = useState(false)
   const [sortOpen, setSortOpen] = useState(false)
-  const [activeType, setActiveType] = useState("All Types")
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
+  const locationRef = useRef<HTMLDivElement>(null)
   const categoryRef = useRef<HTMLDivElement>(null)
-  const typeRef = useRef<HTMLDivElement>(null)
+  const dateRef = useRef<HTMLDivElement>(null)
+  const guestsRef = useRef<HTMLDivElement>(null)
   const sortRef = useRef<HTMLDivElement>(null)
+
+  const locations = ["All Locations", "Tbilisi", "Batumi", "Borjomi", "Kazbegi", "Mtskheta", "Kojori"]
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (locationRef.current && !locationRef.current.contains(event.target as Node)) setLocationOpen(false)
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) setCategoryOpen(false)
-      if (typeRef.current && !typeRef.current.contains(event.target as Node)) setTypeOpen(false)
+      if (dateRef.current && !dateRef.current.contains(event.target as Node)) setDateOpen(false)
+      if (guestsRef.current && !guestsRef.current.contains(event.target as Node)) setGuestsOpen(false)
       if (sortRef.current && !sortRef.current.contains(event.target as Node)) setSortOpen(false)
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -102,6 +484,7 @@ export default function BrowseClient({ venuesData }: Props) {
             locationKey: venueData.location,
             price: venueData.price,
             guests: venueData.maxGuests,
+            sqm: Math.floor(venueData.maxGuests * 8 + Math.random() * 50),
             image: venueData.images?.[0] || "/images/venues/default.jpg",
             images: venueData.images || [],
             description: venueData.description,
@@ -114,7 +497,7 @@ export default function BrowseClient({ venuesData }: Props) {
         })
 
         if (!isMounted) return
-        setAllVenues([...venuesData, ...convertedVenues])
+        setAllVenues([...venuesWithSqm, ...convertedVenues])
         setIsLoading(false)
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return
@@ -129,7 +512,7 @@ export default function BrowseClient({ venuesData }: Props) {
     return () => {
       isMounted = false
     }
-  }, [venuesData])
+  }, [venuesWithSqm])
 
   useEffect(() => {
     const location = searchParams.get("location")
@@ -150,8 +533,8 @@ export default function BrowseClient({ venuesData }: Props) {
       result = result.filter((v) => v.category === activeCategory)
     }
 
-    if (activeCity !== "all") {
-      result = result.filter((v) => v.location === activeCity)
+    if (activeCity !== "all" && activeCity !== "All Locations") {
+      result = result.filter((v) => v.location.includes(activeCity))
     }
 
     if (searchQuery.trim()) {
@@ -164,6 +547,9 @@ export default function BrowseClient({ venuesData }: Props) {
       )
     }
 
+    // Price filter
+    result = result.filter(v => v.price >= priceRange[0] && v.price <= priceRange[1])
+
     // Sort
     if (sortBy === "price-low") {
       result = [...result].sort((a, b) => a.price - b.price)
@@ -175,7 +561,7 @@ export default function BrowseClient({ venuesData }: Props) {
 
     setFiltered(result)
     setCurrentPage(1)
-  }, [searchParams, allVenues, activeCategory, activeCity, searchQuery, sortBy])
+  }, [searchParams, allVenues, activeCategory, activeCity, searchQuery, sortBy, priceRange])
 
   const resolveVenueLabel = (key: string): string =>
     key in t.venueData ? t.venueData[key as keyof typeof t.venueData] : key
@@ -201,71 +587,119 @@ export default function BrowseClient({ venuesData }: Props) {
     return [...new Set(pages)]
   }
 
+  const toggleCapacity = (cap: string) => {
+    setSelectedCapacity(prev => 
+      prev.includes(cap) ? prev.filter(c => c !== cap) : [...prev, cap]
+    )
+  }
+
+  const toggleAmenity = (am: string) => {
+    setSelectedAmenities(prev => 
+      prev.includes(am) ? prev.filter(a => a !== am) : [...prev, am]
+    )
+  }
+
   return (
-    <div className="min-h-screen pt-[72px] md:pt-[88px]">
+    <div className="min-h-screen bg-[#EEF3F8]">
       {/* ============================================ */}
       {/* HERO BANNER                                  */}
       {/* ============================================ */}
-      <section className="relative w-full h-[320px] md:h-[420px] lg:h-[480px] overflow-hidden">
+      <section className="relative w-full h-[380px] md:h-[440px] lg:h-[500px] overflow-hidden">
         {/* Banner Image */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/images/browse.png')" }}
         />
-        {/* Left gradient fade for text readability */}
-        <div className="absolute inset-0 z-[1] bg-gradient-to-r from-[#F5F7FB] via-[#F5F7FB]/80 to-transparent w-[75%] md:w-[55%]" />
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 z-[1] bg-gradient-to-r from-black/50 via-black/30 to-transparent" />
         {/* Bottom fade into page background */}
-        <div className="absolute bottom-0 left-0 right-0 z-[1] h-24 bg-gradient-to-t from-[#F5F7FB] to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 z-[1] h-32 bg-gradient-to-t from-[#EEF3F8] to-transparent" />
 
-        {/* Text Content */}
-        <div className="relative z-10 w-full max-w-[1320px] mx-auto px-6 md:px-12 h-full flex flex-col justify-end pb-16 md:pb-20">
-          <h1 className="text-[#111111] font-bold text-[2.5rem] md:text-[3.2rem] leading-[1.1] tracking-tight mb-3">
-            Find the perfect space
+        {/* Breadcrumb + Text Content */}
+        <div className="relative z-10 w-full max-w-[1400px] mx-auto px-6 md:px-12 h-full flex flex-col justify-center pt-20">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-white/80 text-[13px] font-medium mb-6">
+            <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <ChevronRight className="w-3.5 h-3.5" />
+            <span className="text-white">Browse Venues</span>
+          </div>
+          
+          <h1 className="text-white font-bold text-[2.8rem] md:text-[3.5rem] lg:text-[4rem] leading-[1.05] tracking-tight mb-4">
+            Browse <span className="italic font-serif font-normal">venues</span>
           </h1>
-          <p className="text-[#111111]/60 font-medium text-[15px] md:text-base max-w-[380px] leading-relaxed">
-            Explore unique venues for any occasion.<br />
-            Book in minutes.
+          <p className="text-white/80 font-medium text-[15px] md:text-[16px] max-w-[480px] leading-relaxed">
+            Explore handpicked venues for any occasion.<br />
+            Book the perfect space in minutes.
           </p>
         </div>
       </section>
 
       {/* ============================================ */}
-      {/* FILTER BAR                                   */}
+      {/* FLOATING SEARCH BAR                          */}
       {/* ============================================ */}
-      <div className="sticky top-[60px] md:top-[74px] z-40 w-full max-w-[1320px] mx-auto px-6 md:px-12 -mt-6 pb-4 transition-all duration-300">
-        <div className="w-full bg-white rounded-[24px] shadow-[0_8px_40px_rgba(107,122,144,0.08)] hover:shadow-[0_8px_40px_rgba(107,122,144,0.12)] transition-shadow duration-300 border border-[#E7ECF3] px-5 py-4 flex flex-wrap items-center gap-3">
+      <div className="relative z-20 w-full max-w-[1400px] mx-auto px-6 md:px-12 -mt-10">
+        <div className="bg-white rounded-[20px] shadow-[0_8px_40px_rgba(74,95,127,0.12)] border border-[rgba(74,95,127,0.08)] px-4 md:px-6 py-4 flex flex-wrap items-center gap-3">
           {/* Search Input */}
-          <div className="flex items-center gap-2.5 bg-[#F8FAFC] rounded-[14px] px-4 py-2.5 min-w-[200px] flex-1 md:flex-none md:w-[220px] border border-[#E7ECF3]/60">
-            <Search className="w-4 h-4 text-[#6B7A90]" />
+          <div className="flex items-center gap-2.5 bg-[#F7F9FC] rounded-[14px] px-4 py-3 flex-1 min-w-[200px] md:min-w-[240px] border border-[rgba(74,95,127,0.06)]">
+            <Search className="w-4 h-4 text-[#6B7280]" />
             <input
               type="text"
               placeholder="Search venues, locations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-[13px] font-medium text-[#111111] placeholder:text-[#6B7A90]/60 outline-none w-full"
+              className="bg-transparent text-[13px] font-medium text-[#111827] placeholder:text-[#6B7280]/60 outline-none w-full"
             />
           </div>
 
-          {/* Category Dropdown */}
-          <div className="relative" ref={categoryRef}>
+          {/* Location Dropdown */}
+          <div className="relative hidden md:block" ref={locationRef}>
             <button
-              onClick={() => { setCategoryOpen(!categoryOpen); setTypeOpen(false); setSortOpen(false); }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111111] bg-[#F8FAFC] hover:bg-[#EEF2F7] transition-colors border border-[#E7ECF3]/60 cursor-pointer"
+              onClick={() => { setLocationOpen(!locationOpen); setCategoryOpen(false); setDateOpen(false); setGuestsOpen(false); setSortOpen(false); }}
+              className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer"
             >
-              {categories.find(c => c.value === activeCategory)?.label}
-              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7A90] transition-transform duration-200 ${categoryOpen ? "rotate-180" : ""}`} />
+              <MapPin className="w-4 h-4 text-[#6B7280]" />
+              {activeCity === "all" ? "All Locations" : activeCity}
+              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${locationOpen ? "rotate-180" : ""}`} />
+            </button>
+            {locationOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(74,95,127,0.15)] border border-[rgba(74,95,127,0.08)] overflow-hidden z-50">
+                <div className="py-1.5">
+                  {locations.map((loc) => (
+                    <button
+                      key={loc}
+                      onClick={() => { setActiveCity(loc === "All Locations" ? "all" : loc); setLocationOpen(false); }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#6B7280] hover:bg-[#F7F9FC] hover:text-[#111827] transition-colors text-left cursor-pointer"
+                    >
+                      <span>{loc}</span>
+                      {(activeCity === loc || (loc === "All Locations" && activeCity === "all")) && <Check className="w-3.5 h-3.5 text-[#4A5F7F]" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Category Dropdown */}
+          <div className="relative hidden md:block" ref={categoryRef}>
+            <button
+              onClick={() => { setCategoryOpen(!categoryOpen); setLocationOpen(false); setDateOpen(false); setGuestsOpen(false); setSortOpen(false); }}
+              className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer"
+            >
+              <LayoutGrid className="w-4 h-4 text-[#6B7280]" />
+              {categories.find(c => c.value === activeCategory)?.label || "All Categories"}
+              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${categoryOpen ? "rotate-180" : ""}`} />
             </button>
             {categoryOpen && (
-              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(107,122,144,0.12)] border border-[#E7ECF3] overflow-hidden z-50">
+              <div className="absolute top-full left-0 mt-2 w-52 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(74,95,127,0.15)] border border-[rgba(74,95,127,0.08)] overflow-hidden z-50">
                 <div className="py-1.5">
                   {categories.map((cat) => (
                     <button
                       key={cat.value}
                       onClick={() => { setActiveCategory(cat.value); setCategoryOpen(false); }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#111111]/80 hover:bg-[#F8FAFC] transition-colors text-left"
+                      className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#6B7280] hover:bg-[#F7F9FC] hover:text-[#111827] transition-colors text-left cursor-pointer"
                     >
                       <span>{cat.label}</span>
-                      {activeCategory === cat.value && <Check className="w-3.5 h-3.5 text-[#111111]" />}
+                      {activeCategory === cat.value && <Check className="w-3.5 h-3.5 text-[#4A5F7F]" />}
                     </button>
                   ))}
                 </div>
@@ -273,66 +707,54 @@ export default function BrowseClient({ venuesData }: Props) {
             )}
           </div>
 
-          {/* Type Dropdown */}
-          <div className="relative" ref={typeRef}>
+          {/* Date Dropdown */}
+          <div className="relative hidden lg:block" ref={dateRef}>
             <button
-              onClick={() => { setTypeOpen(!typeOpen); setCategoryOpen(false); setSortOpen(false); }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111111] bg-[#F8FAFC] hover:bg-[#EEF2F7] transition-colors border border-[#E7ECF3]/60 cursor-pointer"
+              onClick={() => { setDateOpen(!dateOpen); setLocationOpen(false); setCategoryOpen(false); setGuestsOpen(false); setSortOpen(false); }}
+              className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer"
             >
-              {activeType}
-              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7A90] transition-transform duration-200 ${typeOpen ? "rotate-180" : ""}`} />
+              Any Date
+              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${dateOpen ? "rotate-180" : ""}`} />
             </button>
-            {typeOpen && (
-              <div className="absolute top-full left-0 mt-2 w-40 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(107,122,144,0.12)] border border-[#E7ECF3] overflow-hidden z-50">
-                <div className="py-1.5">
-                  {venueTypes.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => { setActiveType(type); setTypeOpen(false); }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#111111]/80 hover:bg-[#F8FAFC] transition-colors text-left"
-                    >
-                      <span>{type}</span>
-                      {activeType === type && <Check className="w-3.5 h-3.5 text-[#111111]" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Guests */}
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111111] bg-[#F8FAFC] hover:bg-[#EEF2F7] transition-colors border border-[#E7ECF3]/60 cursor-pointer">
-            <Users className="w-3.5 h-3.5 text-[#6B7A90]" />
-            Guests
-          </button>
-
-          {/* Price */}
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111111] bg-[#F8FAFC] hover:bg-[#EEF2F7] transition-colors border border-[#E7ECF3]/60 cursor-pointer">
-            Price
-            <ChevronDown className="w-3.5 h-3.5 text-[#6B7A90]" />
-          </button>
+          {/* Guests Dropdown */}
+          <div className="relative hidden lg:block" ref={guestsRef}>
+            <button
+              onClick={() => { setGuestsOpen(!guestsOpen); setLocationOpen(false); setCategoryOpen(false); setDateOpen(false); setSortOpen(false); }}
+              className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-[#6B7280]" />
+              Any Guests
+              <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${guestsOpen ? "rotate-180" : ""}`} />
+            </button>
+          </div>
 
           {/* More Filters */}
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#6B7A90] bg-[#F8FAFC] hover:bg-[#EEF2F7] transition-colors border border-[#E7ECF3]/60 cursor-pointer">
-            <SlidersHorizontal className="w-3.5 h-3.5" />
+          <button 
+            onClick={() => setMobileFiltersOpen(true)}
+            className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#6B7280] bg-[#F7F9FC] hover:bg-[#EEF3F8] transition-colors border border-[rgba(74,95,127,0.06)] cursor-pointer lg:hidden"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
             More filters
           </button>
 
           {/* Spacer */}
-          <div className="flex-1" />
+          <div className="flex-1 hidden lg:block" />
 
-          {/* Sort + Grid toggle */}
-          <div className="flex items-center gap-2">
+          {/* Sort + View toggle */}
+          <div className="flex items-center gap-2 ml-auto lg:ml-0">
+            <span className="text-[12px] text-[#6B7280] font-medium hidden xl:inline">Sort by:</span>
             <div className="relative" ref={sortRef}>
               <button
-                onClick={() => { setSortOpen(!sortOpen); setCategoryOpen(false); setTypeOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] text-[13px] font-semibold text-[#111111] hover:bg-[#F8FAFC] transition-colors cursor-pointer"
+                onClick={() => { setSortOpen(!sortOpen); setLocationOpen(false); setCategoryOpen(false); setDateOpen(false); setGuestsOpen(false); }}
+                className="flex items-center gap-2 px-4 py-3 rounded-[14px] text-[13px] font-semibold text-[#111827] hover:bg-[#F7F9FC] transition-colors cursor-pointer"
               >
-                Sort by: <span className="text-[#111111]">{sortBy === "popular" ? "Popular" : sortBy === "price-low" ? "Price ↑" : sortBy === "price-high" ? "Price ↓" : "Guests"}</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-[#6B7A90] transition-transform duration-200 ${sortOpen ? "rotate-180" : ""}`} />
+                {sortBy === "popular" ? "Popular" : sortBy === "price-low" ? "Price: Low" : sortBy === "price-high" ? "Price: High" : "Guests"}
+                <ChevronDown className={`w-3.5 h-3.5 text-[#6B7280] transition-transform duration-200 ${sortOpen ? "rotate-180" : ""}`} />
               </button>
               {sortOpen && (
-                <div className="absolute top-full right-0 mt-2 w-44 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(107,122,144,0.12)] border border-[#E7ECF3] overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-[16px] shadow-[0_16px_48px_rgba(74,95,127,0.15)] border border-[rgba(74,95,127,0.08)] overflow-hidden z-50">
                   <div className="py-1.5">
                     {[
                       { value: "popular", label: "Popular" },
@@ -343,112 +765,173 @@ export default function BrowseClient({ venuesData }: Props) {
                       <button
                         key={opt.value}
                         onClick={() => { setSortBy(opt.value); setSortOpen(false); }}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#111111]/80 hover:bg-[#F8FAFC] transition-colors text-left"
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-[13px] font-medium text-[#6B7280] hover:bg-[#F7F9FC] hover:text-[#111827] transition-colors text-left cursor-pointer"
                       >
                         <span>{opt.label}</span>
-                        {sortBy === opt.value && <Check className="w-3.5 h-3.5 text-[#111111]" />}
+                        {sortBy === opt.value && <Check className="w-3.5 h-3.5 text-[#4A5F7F]" />}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
             </div>
-            {/* Grid icon */}
-            <button className="w-10 h-10 rounded-[14px] border border-[#E7ECF3] flex items-center justify-center hover:bg-[#F8FAFC] transition-colors cursor-pointer">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="#111111" strokeWidth="1.5"/>
-                <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="#111111" strokeWidth="1.5"/>
-                <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="#111111" strokeWidth="1.5"/>
-                <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="#111111" strokeWidth="1.5"/>
-              </svg>
-            </button>
+            
+            {/* View toggle buttons */}
+            <div className="hidden md:flex items-center border border-[rgba(74,95,127,0.08)] rounded-[14px] overflow-hidden">
+              <button 
+                onClick={() => setViewMode("grid")}
+                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "grid" ? "bg-[#4A5F7F] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setViewMode("list")}
+                className={`w-10 h-10 flex items-center justify-center transition-colors cursor-pointer ${viewMode === "list" ? "bg-[#4A5F7F] text-white" : "bg-white text-[#6B7280] hover:bg-[#F7F9FC]"}`}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* ============================================ */}
-      {/* RESULTS COUNT                                */}
+      {/* MAIN CONTENT: SIDEBAR + RESULTS              */}
       {/* ============================================ */}
-      <div className="w-full max-w-[1320px] mx-auto px-6 md:px-12 mt-8 mb-6">
-        <p className="text-[14px] font-medium text-[#6B7A90]">
-          {filtered.length} venues found
-        </p>
-      </div>
+      <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 py-8 md:py-12">
+        <div className="flex gap-8">
+          {/* Left Sidebar - Hidden on mobile/tablet */}
+          <aside className="hidden lg:block w-[280px] flex-shrink-0">
+            <div className="sticky top-[120px]">
+              <FilterSidebar
+                activeCategory={activeCategory}
+                setActiveCategory={setActiveCategory}
+                priceRange={priceRange}
+                setPriceRange={setPriceRange}
+                selectedCapacity={selectedCapacity}
+                setSelectedCapacity={(caps) => setSelectedCapacity(caps)}
+                selectedAmenities={selectedAmenities}
+                setSelectedAmenities={(ams) => setSelectedAmenities(ams)}
+              />
+            </div>
+          </aside>
 
-      {/* ============================================ */}
-      {/* VENUE CARDS GRID                             */}
-      {/* ============================================ */}
-      <div className="w-full max-w-[1320px] mx-auto px-6 md:px-12 pb-8">
-        {filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-lg text-[#6B7A90] mb-6">
-              No venues match your search criteria
-            </p>
-            <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 bg-[#111111] text-white rounded-[14px] font-semibold text-[14px] hover:bg-black transition-colors">
-              Try different filters
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {isLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <BrowseVenueCardSkeleton key={i} />
-              ))
+          {/* Right Content Area */}
+          <div className="flex-1 min-w-0">
+            {/* Results count */}
+            <div className="mb-6">
+              <p className="text-[14px] font-medium text-[#6B7280]">
+                {filtered.length} venues found
+              </p>
+            </div>
+
+            {/* Venue Cards Grid */}
+            {filtered.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-[20px] border border-[rgba(74,95,127,0.08)]">
+                <p className="text-lg text-[#6B7280] mb-6">
+                  No venues match your search criteria
+                </p>
+                <button 
+                  onClick={() => {
+                    setActiveCategory("all")
+                    setActiveCity("all")
+                    setSearchQuery("")
+                    setPriceRange([0, 2000])
+                  }}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#111827] text-white rounded-[14px] font-semibold text-[14px] hover:bg-black transition-colors cursor-pointer"
+                >
+                  Clear all filters
+                </button>
+              </div>
             ) : (
-              paginatedVenues.map((venue) => (
-                <BrowseVenueCard
-                  key={venue.id}
-                  venue={venue}
-                  resolveLabel={resolveVenueLabel}
-                />
-              ))
+              <div className={`grid gap-5 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "grid-cols-1"}`}>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <VenueCardSkeleton key={i} />
+                  ))
+                ) : (
+                  paginatedVenues.map((venue) => (
+                    <VenueCard
+                      key={venue.id}
+                      venue={venue}
+                      resolveLabel={resolveVenueLabel}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-12 flex items-center justify-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 rounded-[12px] border border-[rgba(74,95,127,0.08)] bg-white flex items-center justify-center hover:bg-[#F7F9FC] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4 text-[#111827]" />
+                </button>
+
+                {getPageNumbers().map((page, idx) =>
+                  typeof page === "string" ? (
+                    <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-[13px] text-[#6B7280]">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-10 h-10 rounded-[12px] text-[13px] font-semibold flex items-center justify-center transition-colors cursor-pointer ${
+                        currentPage === page
+                          ? "bg-[#4A5F7F] text-white shadow-[0_4px_12px_rgba(74,95,127,0.2)]"
+                          : "text-[#111827] bg-white hover:bg-[#F7F9FC] border border-[rgba(74,95,127,0.08)]"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 rounded-[12px] border border-[rgba(74,95,127,0.08)] bg-white flex items-center justify-center hover:bg-[#F7F9FC] transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4 text-[#111827]" />
+                </button>
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* ============================================ */}
-      {/* PAGINATION                                   */}
-      {/* ============================================ */}
-      {totalPages > 1 && (
-        <div className="w-full max-w-[1320px] mx-auto px-6 md:px-12 pb-16 flex items-center justify-center gap-1.5">
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="w-10 h-10 rounded-[12px] border border-[#E7ECF3] flex items-center justify-center hover:bg-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4 text-[#111111]" />
-          </button>
-
-          {getPageNumbers().map((page, idx) =>
-            typeof page === "string" ? (
-              <span key={`dots-${idx}`} className="w-10 h-10 flex items-center justify-center text-[13px] text-[#6B7A90]">
-                ...
-              </span>
-            ) : (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`w-10 h-10 rounded-[12px] text-[13px] font-semibold flex items-center justify-center transition-colors cursor-pointer ${
-                  currentPage === page
-                    ? "bg-[#111111] text-white shadow-[0_4px_12px_rgba(17,17,17,0.15)]"
-                    : "text-[#111111] hover:bg-white border border-[#E7ECF3]"
-                }`}
-              >
-                {page}
-              </button>
-            )
-          )}
-
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className="w-10 h-10 rounded-[12px] border border-[#E7ECF3] flex items-center justify-center hover:bg-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          >
-            <ChevronRight className="w-4 h-4 text-[#111111]" />
-          </button>
-        </div>
-      )}
+      {/* Mobile Filters Sheet */}
+      <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+        <SheetContent side="left" className="w-[320px] sm:w-[380px] p-0 bg-[#EEF3F8]">
+          <SheetHeader className="p-5 border-b border-[rgba(74,95,127,0.08)] bg-white">
+            <SheetTitle className="text-[16px] font-bold text-[#111827]">Filters</SheetTitle>
+          </SheetHeader>
+          <div className="p-5 overflow-y-auto h-[calc(100vh-80px)]">
+            <FilterSidebar
+              activeCategory={activeCategory}
+              setActiveCategory={setActiveCategory}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              selectedCapacity={selectedCapacity}
+              setSelectedCapacity={(caps) => setSelectedCapacity(caps)}
+              selectedAmenities={selectedAmenities}
+              setSelectedAmenities={(ams) => setSelectedAmenities(ams)}
+              className="bg-white"
+            />
+            <button 
+              onClick={() => setMobileFiltersOpen(false)}
+              className="w-full mt-6 py-3.5 bg-[#4A5F7F] text-white rounded-[14px] font-semibold text-[14px] hover:bg-[#3B4E69] transition-colors cursor-pointer"
+            >
+              Show {filtered.length} results
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
