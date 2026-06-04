@@ -107,10 +107,10 @@ function VenueCard({
   }, [venue.image])
 
   return (
-    <div className="group relative bg-white rounded-[20px] overflow-hidden border border-[rgba(74,95,127,0.08)] hover:shadow-[0_16px_48px_rgba(74,95,127,0.12)] transition-all duration-300 cursor-pointer">
+    <div className="group relative bg-white rounded-[24px] overflow-hidden border border-[rgba(74,95,127,0.08)] hover:shadow-[0_16px_48px_rgba(74,95,127,0.12)] hover:-translate-y-1.5 transition-all duration-[250ms] cursor-pointer">
       <Link href={`/venues/${detailPageId}`} className="block">
         {/* Image Container */}
-        <div className="relative aspect-[4/3] overflow-hidden bg-[#F7F9FC]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[#F7F9FC] rounded-t-[20px]">
           {imageLoading ? (
             <Skeleton className="w-full h-full" />
           ) : (
@@ -118,7 +118,7 @@ function VenueCard({
               src={resolvedImage || "/images/venues/default.jpg"}
               alt={venueName}
               fill
-              className="object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
+              className="object-cover group-hover:scale-[1.04] transition-transform duration-[250ms] ease-out"
               loading="lazy"
               sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
             />
@@ -199,7 +199,7 @@ function VenueCard({
 
 function VenueCardSkeleton() {
   return (
-    <div className="bg-white rounded-[20px] overflow-hidden border border-[rgba(74,95,127,0.08)]">
+    <div className="bg-white rounded-[24px] overflow-hidden border border-[rgba(74,95,127,0.08)]">
       <Skeleton className="aspect-[4/3] w-full" />
       <div className="p-5 space-y-3">
         <Skeleton className="h-5 w-3/4" />
@@ -242,7 +242,7 @@ function FilterSidebar({
   const [amenitiesOpen, setAmenitiesOpen] = useState(true)
 
   return (
-    <div className={`bg-[#F7F9FC] rounded-[20px] border border-[rgba(74,95,127,0.08)] p-5 ${className}`}>
+    <div className={`bg-[#F7F9FC] rounded-[24px] border border-[rgba(74,95,127,0.08)] p-6 ${className}`}>
       {/* Categories Section */}
       <div className="mb-6">
         <button 
@@ -801,7 +801,7 @@ export default function BrowseClient({ venuesData }: Props) {
       <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 py-8 md:py-12">
         <div className="flex gap-8">
           {/* Left Sidebar - Hidden on mobile/tablet */}
-          <aside className="hidden lg:block w-[280px] flex-shrink-0">
+          <aside className="hidden lg:block w-[300px] flex-shrink-0">
             <div className="sticky top-[120px]">
               <FilterSidebar
                 activeCategory={activeCategory}
@@ -827,7 +827,7 @@ export default function BrowseClient({ venuesData }: Props) {
 
             {/* Venue Cards Grid */}
             {filtered.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-[20px] border border-[rgba(74,95,127,0.08)]">
+              <div className="text-center py-20 bg-white rounded-[24px] border border-[rgba(74,95,127,0.08)]">
                 <p className="text-lg text-[#6B7280] mb-6">
                   No venues match your search criteria
                 </p>
@@ -844,7 +844,7 @@ export default function BrowseClient({ venuesData }: Props) {
                 </button>
               </div>
             ) : (
-              <div className={`grid gap-5 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "grid-cols-1"}`}>
+              <div className={`grid gap-6 ${viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4" : "grid-cols-1"}`}>
                 {isLoading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <VenueCardSkeleton key={i} />
